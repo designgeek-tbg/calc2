@@ -1,1 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Vinyl Pricing Calculator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #f7f9fc;
+      color: #333;
+      padding: 40px;
+      max-width: 700px;
+      margin: auto;
+    }
+
+    img.logo {
+      display: block;
+      margin: 0 auto 20px;
+      max-width: 200px;
+    }
+
+    h1 {
+      text-align: center;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    form {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 5px 10px rgba(0,0,0,0.05);
+    }
+
+    label {
+      font-weight: 500;
+      display: block;
+      margin: 10px 0 5px;
+    }
+
+    input[type="number"],
+    input[type="text"],
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      font-size: 16px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    button {
+      background-color: #0077cc;
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    h2 {
+      margin-top: 30px;
+      font-weight: 600;
+    }
+
+    #wasteResult.good { color: green; }
+    #wasteResult.okay { color: goldenrod; }
+    #wasteResult.poor { color: darkorange; }
+    #wasteResult.awful { color: red; }
+
+    canvas {
+      display: block;
+      margin: 20px auto 10px;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+
+    #printPreviewHeader {
+      text-align: center;
+      font-weight: 600;
+      font-size: 18px;
+      margin-top: 30px;
+    }
+
+    #canvasPlaceholderMessage {
+      text-align: center;
+      color: #777;
+      margin-bottom: 10px;
+    }
+
+    #resultsBox {
+      background: #fff;
+      padding: 15px 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      margin-bottom: 10px;
+    }
+
+    #resultsBox .highlighted {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    #resultsBox .sub-results p {
+      font-size: 14px;
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <img src="https://storage.googleapis.com/msgsndr/WwZUnNsXnaNcr7lppqgF/media/684c3a863317f8eec4bf0d8c.svg" alt="Logo" class="logo">
+  <h1>Vinyl Pricing Calculator</h1>
+
+  <form id="pricing-form">
+    <label for="unit">Units (for width & height):</label>
+    <select id="unit">
+      <option value="mm">Millimetres (mm)</option>
+      <option value="cm">Centimetres (cm)</option>
+      <option value="in">Inches (in)</option>
+      <option value="ft">Feet (ft)</option>
+    </select>
+
+    <label for="width">Width (or diameter):</label>
+    <input type="number" id="width" step="0.1" required>
+
+    <label for="length">Length (ignored for circles):</label>
+    <input type="number" id="length" step="0.1" required>
+
+    <label for="quantity">Quantity:</label>
+    <input type="number" id="quantity" required>
+
+    <label for="gap">Gap between pieces (mm):</label>
+    <input type="number" id="gap" value="5" required>
+
+    <label for="shape">Shape:</label>
+    <select id="shape">
+      <option value="rectangle">Rectangle</option>
+      <option value="circle">Circle</option>
+    </select>
+
+    <label for="material">Material Type:</label>
+    <select id="material" required>
+      <option value="50">Standard Vinyl (€50/m)</option>
+      <option value="75">High Value Vinyl (€75/m)</option>
+    </select>
+
+    <label for="rollWidth">Roll Width (in mm):</label>
+    <input type="number" id="rollWidth" step="0.1" value="1300" required>
+
+    <button type="submit">Calculate</button>
+  </form>
+
+  <h2>Result</h2>
+  <div id="resultsBox">
+    <p id="totalPrice" class="highlighted">Total Price: -</p>
+    <div class="sub-results">
+      <p id="materialLength">Total Material Length: -</p>
+      <p id="wasteResult">Waste: -</p>
+      <p id="timeEstimate">Estimated Print Time: -</p>
+      <p id="fitNote">Rows/Columns: -</p>
+      <p id="fillSuggestion">Suggestions: -</p>
+    </div>
+  </div>
+
+  <h2 id="printPreviewHeader">Print Preview</h2>
+  <div id="canvasPlaceholderMessage">Enter values and click Calculate to preview layout.</div>
+  <canvas id="fitDiagram" width="600" height="200"></canvas>
+
+  <script>
+    function convertToMeters(value, unit) {
+      switch (unit) {
+        case 'mm': return value / 1000;
+        case 'cm': return value / 100;
+        case 'in': return value * 0.0254;
+        case 'ft': return value * 0.3048;
+        default: return value;
+      }
+    }
+
+    function classifyWaste(p) {
+      if (p < 10) return ["Great news for the Parish! 🎉", "good"];
+      if (p < 25) return ["Okay I'd say!👍", "okay"];
+      if (p < 40) return ["Poor Enough! 😩", "poor"];
+      return ["An AWFUL waste altogether! 😡", "awful"];
+    }
+
+    document.getElementById("pricing-form").addEventListener("submit", function(e) {
+      e.preventDefault();
+      document.getElementById('printPreviewHeader').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('canvasPlaceholderMessage').style.display = 'none';
+
+      const unit = document.getElementById('unit').value;
+      const width = parseFloat(document.getElementById('width').value);
+      const length = parseFloat(document.getElementById('length').value);
+      const qty = parseInt(document.getElementById('quantity').value);
+      const gap = parseFloat(document.getElementById('gap').value);
+      const shape = document.getElementById('shape').value;
+      const price = parseFloat(document.getElementById('material').value);
+      const roll = parseFloat(document.getElementById('rollWidth').value);
+
+      const canvas = document.getElementById('fitDiagram');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const rollM = roll / 1000;
+      const gapM = gap / 1000;
+      const widthM = convertToMeters(width, unit);
+      const lengthM = (shape === 'circle') ? widthM : convertToMeters(length, unit);
+
+      let wM = widthM, lM = lengthM, rotated = false;
+      if (shape === 'rectangle' && widthM > rollM && lengthM <= rollM) {
+        wM = lengthM;
+        lM = widthM;
+        rotated = true;
+      } else if (widthM > rollM && lengthM > rollM) {
+        alert("Neither width nor length fits the roll.");
+        return;
+      }
+
+      const perRow = Math.floor((rollM + gapM) / (wM + gapM));
+      const rows = Math.ceil(qty / perRow);
+      const totalLen = rows * lM + gapM * (rows - 1);
+      const totalPrice = totalLen * price;
+
+      const usedArea = qty * (wM * lM);
+      const totalArea = rollM * totalLen;
+      const unused = totalArea - usedArea;
+      const waste = (unused / totalArea) * 100;
+      const [label, cls] = classifyWaste(waste);
+
+      const estTime = totalLen * 20;
+      const hrs = Math.floor(estTime / 60);
+      const mins = Math.round(estTime % 60);
+
+      document.getElementById('materialLength').textContent = `Total Material Length: ${(totalLen * (unit === 'mm' ? 1000 : 1)).toFixed(1)} ${unit}`;
+      document.getElementById('totalPrice').textContent = `Total Price: €${totalPrice.toFixed(2)}`;
+      document.getElementById('wasteResult').textContent = `Wasted Material: ${waste.toFixed(1)}% → ${label}`;
+      document.getElementById('wasteResult').className = cls;
+      document.getElementById('timeEstimate').textContent = `Estimated Print Time: ${hrs > 0 ? hrs + 'h ' : ''}${mins} mins`;
+      document.getElementById('fitNote').textContent = `${rotated ? 'Rotated to fit roll' : 'Fitting in normal orientation'} | Rows: ${rows}, Columns: ${perRow}`;
+
+      const leftover = (perRow * rows) - qty;
+      document.getElementById('fillSuggestion').textContent = leftover > 0 && qty > 0 ? `Suggestion: Adding ${leftover} more prints would be a better use of space.` : 'Suggestions: None';
+
+      const margin = 20;
+      const scale = (canvas.width - margin * 2) / rollM;
+      const rowHeight = lM * scale + gapM * scale;
+      const layoutHeight = rows * rowHeight - gapM * scale;
+      const canvasHeight = Math.max(200, layoutHeight + margin * 2);
+      canvas.height = canvasHeight;
+
+      const rollY = (canvas.height - layoutHeight) / 2;
+      ctx.strokeStyle = "#000";
+      ctx.strokeRect(margin, rollY, rollM * scale, layoutHeight);
+
+      let count = 0;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < perRow; c++) {
+          if (count >= qty) break;
+          const rowWidthPx = perRow * (wM + gapM) * scale - gapM * scale;
+          const offsetX = (canvas.width - rowWidthPx) / 2;
+          const x = offsetX + c * (wM + gapM) * scale;
+          const y = rollY + r * (lM + gapM) * scale;
+
+          ctx.fillStyle = "#0077cc";
+          ctx.strokeStyle = "#000";
+
+          if (shape === 'circle') {
+            const radius = (wM * scale) / 2;
+            ctx.beginPath();
+            ctx.arc(x + radius, y + lM * scale / 2, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillRect(x, y, wM * scale, lM * scale);
+            ctx.strokeRect(x, y, wM * scale, lM * scale);
+          }
+          count++;
+        }
+      }
+
+      ctx.fillStyle = "#000";
+      ctx.font = "10px Poppins";
+      ctx.textAlign = "center";
+      ctx.fillText(`${Math.round(rollM * 1000)}mm roll width`, canvas.width / 2, 10);
+
+      ctx.save();
+      ctx.translate(margin - 10, canvas.height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = "center";
+      ctx.fillText(`${totalLen.toFixed(2)} m`, 0, 0);
+      ctx.restore();
+    });
+  </script>
+</body>
+</html>
 
