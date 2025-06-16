@@ -243,7 +243,7 @@
       const mins = Math.round(estTime % 60);
 
       document.getElementById('materialLength').textContent = `Total Material Length: ${(totalLen * (unit === 'mm' ? 1000 : 1)).toFixed(1)} ${unit}`;
-      document.getElementById('totalPrice').textContent = `Total Price: €${totalPrice.toFixed(2)}`;
+      document.getElementById('totalPrice').textContent = `Total Price: €${totalPrice.toFixed(2)} ex VAT`;
       document.getElementById('wasteResult').textContent = `Wasted Material: ${waste.toFixed(1)}% → ${label}`;
       document.getElementById('wasteResult').className = cls;
       document.getElementById('timeEstimate').textContent = `Estimated Print Time: ${hrs > 0 ? hrs + 'h ' : ''}${mins} mins`;
